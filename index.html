@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="initial-scale=1,maximum-scale=1,user-scalable=no"
+    />
+    <title>Search widget with multiple sources - 4.11</title>
+
+    <style>
+      html,
+      body,
+      #viewDiv {
+        padding: 0;
+        margin: 0;
+        height: 100%;
+        width: 100%;
+      }
+      .search-menu {
+        height: auto;
+        background-color: white;
+        padding-bottom: 1em;
+        border-radius: 1em;
+      }
+      .search-item {
+        margin: 2em;
+      }
+      input[type="text"] {
+        margin: 0 !important;
+      }
+      .collection {
+        margin: 0 !important;
+        box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14),
+          0 3px 1px -2px rgba(0, 0, 0, 0.12), 0 1px 5px 0 rgba(0, 0, 0, 0.2);
+      }
+      .collection .collection-item {
+        font-size: 16px;
+        color: #26a69a;
+        line-height: 22px;
+        padding: 14px 16px;
+      }
+      .collection .collection-item:hover {
+        background-color: #eee !important;
+        cursor: pointer;
+      }
+      #block_complete {
+        display: none;
+      }
+      #nameroom_complete {
+        display: none;
+      }
+      #roomnum_complete {
+        display: none;
+      }
+      .input-field > label:not(.label-icon).active {
+        -webkit-transform: translateY(-14px) scale(0.8);
+        transform: translateY(-6px) scale(0.8) !important;
+        -webkit-transform-origin: 0 0;
+        transform-origin: 0 0;
+      }
+      .activeUl {
+        display: block !important;
+      }
+      .search-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .small-padding {
+        padding: 0 8px;
+      }
+      .danger {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 5px 14px;
+        color: white;
+        border-radius: 10px;
+        background-color: #f36860;
+      }
+      #dangerLi {
+        color: white;
+        background-color: #f36860!important;
+      }
+    </style>
+    <link
+      href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://js.arcgis.com/4.13/esri/themes/light/main.css"
+    />
+    <script src="https://js.arcgis.com/4.13/"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+
+    <script>
+      require([
+        // **Map**
+        "esri/Map",
+        "esri/views/SceneView",
+        // **Search**
+        "esri/tasks/QueryTask",
+        "esri/tasks/support/Query",
+        "esri/Graphic",
+        "esri/layers/GraphicsLayer",
+        // **Direction**
+        "esri/widgets/Directions",
+        "esri/tasks/Locator",
+        "esri/symbols/SimpleMarkerSymbol"
+      ], function(
+        Map, SceneView, // **Map**
+        QueryTask, Query, Graphic, GraphicsLayer, // **Search**
+        Directions, Locator, SimpleMarkerSymbol // **Direction**
+      ) {
+        // **Map**
+        var map = new Map({
+          basemap: "dark-gray"
+        });
+        
+        var view = new SceneView({
+          container: "viewDiv",
+          map: map,
+          center: [71.400957, 51.089915],
+          scale: "4000"
+        });
+        
+        // **Search**
+        // add Graphic
+        var graphic_layer = new GraphicsLayer();
+        map.add(graphic_layer);
+
+        const search_block = document.getElementById("search_block");
+        const search_nameroom = document.getElementById("search_nameroom");
+        const search_roomnum = document.getElementById("search_roomnum");
+        const input_block = document.getElementById("block");
+        const input_nameroom = document.getElementById("nameroom");
+        const input_roomnum = document.getElementById("roomnum");
+        const block_ul = document.getElementById("block_complete");
+        const nameroom_ul = document.getElementById("nameroom_complete");
+        const roomnum_ul = document.getElementById("roomnum_complete");
+        const search_button = document.getElementById("search_button");
+        var empty_block = "";
+        
+        // **Direction**
+        var stairs_url = "https://kazaerospace01/arcgis/rest/services/NU/routeStairs/NAServer/%D0%9C%D0%B0%D1%80%D1%88%D1%80%D1%83%D1%82"
+        var elevator_url = "https://kazaerospace01/arcgis/rest/services/NU/Routeelevator/NAServer/%D0%9C%D0%B0%D1%80%D1%88%D1%80%D1%83%D1%82"
+        var directionsWidget = new Directions({
+          view: view,
+          routeServiceUrl: stairs_url,
+          searchProperties: {
+            popupEnabled: true,
+            resultGraphicEnabled: true,
+            searchAllEnabled: false,
+            activeSourceIndex: 1,
+            sources: [{
+              locator: new Locator({
+                url: "https://kazaerospace01/arcgis/rest/services/NU/RoomsLocSF/GeocodeServer"
+              }),
+              outFields: ["*"]
+            }]
+          }
+        });
+        view.ui.add(directionsWidget, {
+          position: "top-left"
+        });
+        
+        view.when(function() {
+          // **Search**
+          view.ui.add(search, "top-right");
+          let button = document.querySelector(".waves-effect");
+          // click "Search"
+          button.addEventListener("click", function() {
+            doQueryEnd();
+          });
+          // Проверка клика
+          document.body.addEventListener("click", function(e) {
+            let activeUl = document.querySelector(".activeUl");
+            // Открыт ли dropdown
+            if (activeUl) {
+              let src_el = e.srcElement;
+              // console.log(e)
+              // Клик был по dropdown
+              if (src_el.localName == "li" && src_el.id != "dangerLi") {
+                let text_li = src_el.textContent;
+                switch (src_el.parentElement.id) {
+                  case "block_complete":
+                    document.querySelector("#block").focus();
+                    input_block.value = text_li;
+                    break;
+                  case "nameroom_complete":
+                    document.querySelector("#nameroom").focus();
+                    input_nameroom.value = text_li;
+                    break;
+                  case "roomnum_complete":
+                    document.querySelector("#roomnum").focus();
+                    input_roomnum.value = text_li;
+                    break;
+                }
+                checkReadySearch();
+                checkAndCloseDropdown();
+                // Клик был не по dropdown
+              } else if (src_el.id != "dangerLi") {
+                let check_active = false;
+                let next_el = e.srcElement.nextElementSibling;
+                if (next_el) {
+                  if (next_el.classList) {
+                    next_el.classList.forEach((el) => {
+                      if (el == "activeUl") {
+                        // console.log("find activeul");
+                        check_active = true;
+                      }
+                    });
+                  }
+                }
+                // Закрывает dropdown если открыт
+                if (!check_active) {
+                  checkAndCloseDropdown();
+                }
+              }
+            }
+            // if click to empty search and request
+            if (e.srcElement.localName == "input" && e.srcElement.value == "" && (input_block.value || input_roomnum.value || input_nameroom.value)) {
+              empty_block = e.srcElement.id;
+              doQueryEmpty(e.srcElement.id);
+            }
+          });
+          // **Direction**
+          // create select for stairs/elevator
+          let div_splitter = document.querySelector('div.esri-directions__section-splitter');
+          let select = document.createElement("select");
+          select.setAttribute("class", "esri-directions__travel-modes-select esri-select")
+          select.setAttribute("id", "switch");
+          select.setAttribute("aria-label", "лестница");
+          select.setAttribute("title", "лестница");
+          // create stairs/elevator
+          let option1 = document.createElement("option");
+          let option2 = document.createElement("option");
+          option1.setAttribute("value", "1");
+          option1.innerHTML = 'Лестница';
+          option2.setAttribute("value", "2");
+          option2.innerHTML = 'Лифт';
+          select.append(option1);
+          select.append(option2);
+          // add select to widget
+          setTimeout(() => {
+            div_splitter.before(select);
+          }, 1000)
+          // check and direction request
+          let select_index = select.selectedIndex;
+          select.addEventListener('click', function() {
+            if (select_index != select.selectedIndex) {
+              if (select.selectedIndex == 0) {
+                directionsWidget.routeServiceUrl = stairs_url;
+                directionsWidget.getDirections();
+              } else if (select.selectedIndex == 1) {
+                directionsWidget.routeServiceUrl = elevator_url;
+                directionsWidget.getDirections();
+              }
+              select_index = select.selectedIndex;
+            }
+          })
+        });//view.when()
+        // **Search**
+        // empty search request
+        const doQueryEmpty = (name) => {
+          // console.log("doQueryEmpty");
+          checkAndCloseDropdown();
+          clearUlListSelf();
+          let qTask = new QueryTask({
+            url: `https://kazaerospace01/arcgis/rest/services/CampusMap2d_MIL1/MapServer/3`
+          });
+          let params = new Query();
+          let sqlTxt = "";
+          let out_fields = "";
+          switch (name) {
+            case "block":
+              if (input_nameroom.value && input_roomnum.value) {
+                sqlTxt =
+                  "nameroom = '" +
+                  input_nameroom.value +
+                  "' AND roomnum = '" +
+                  input_roomnum.value +
+                  "'";
+              } else if (input_nameroom.value) {
+                sqlTxt = "nameroom = '" + input_nameroom.value + "'";
+              } else if (input_roomnum.value) {
+                sqlTxt = "roomnum = '" + input_roomnum.value + "'";
+              }
+              out_fields = "block";
+              break;
+            case "nameroom":
+              if (input_block.value && input_roomnum.value) {
+                sqlTxt =
+                  "block = '" +
+                  input_block.value +
+                  "' AND roomnum = '" +
+                  input_roomnum.value +
+                  "'";
+              } else if (input_block.value) {
+                sqlTxt = "block = '" + input_block.value + "'";
+              } else if (input_roomnum.value) {
+                sqlTxt = "roomnum = '" + input_roomnum.value + "'";
+              }
+              out_fields = "nameroom";
+              break;
+            case "roomnum":
+              if (input_block.value && input_nameroom.value) {
+                sqlTxt =
+                  "block = '" +
+                  input_block.value +
+                  "' AND nameroom = '" +
+                  input_nameroom.value +
+                  "'";
+              } else if (input_block.value) {
+                sqlTxt = "block = '" + input_block.value + "'";
+              } else if (input_nameroom.value) {
+                sqlTxt = "nameroom = '" + input_nameroom.value + "'";
+              }
+              out_fields = "roomnum";
+              break;
+          }
+          // console.log(sqlTxt);
+          params.where = sqlTxt;
+          params.outFields = [out_fields];
+          params.returnGeometry = false;
+          params.returnDistinctValues = true;
+          qTask
+            .execute(params)
+            .then(getResultsEmpty)
+            .catch(promiseRejectedEmpty);
+        };
+        // Получение результатов
+        const getResultsEmpty = (response) => {
+          // console.log("features", response.features);
+          let length = response.features.length;
+          if (length == 0) {
+            // console.log("Нет данных по данному запросу");
+            let li = document.createElement("li");
+            li.setAttribute("class", "collection-item");
+            li.innerHTML = "Нет данных по запросу";
+            let active_element = document.activeElement.id;
+            switch (active_element) {
+              case "block":
+                block_ul.appendChild(li);
+                block_ul.classList.add("activeUl");
+                break;
+              case "nameroom":
+                nameroom_ul.appendChild(li);
+                nameroom_ul.classList.add("activeUl");
+                break;
+              case "roomnum":
+                roomnum_ul.appendChild(li);
+                roomnum_ul.classList.add("activeUl");
+                break;
+            }
+          } else {
+            // console.log(response.features);
+            addUlLiEmpty(response.features);
+          }
+        }; // getResultsEnd
+        // Вызывается каждый раз, когда запрос отклоняется
+        const promiseRejectedEmpty = (error) => {
+          console.error("Promise rejected: ", error.message);
+        }; // promiseRejectedEnd
+        // fill in Ul after request
+        const addUlLiEmpty = (features) => {
+          let index1 = 0;
+          let index2 = 0;
+          let len = 6;
+          let length = features.length;
+          switch (empty_block) {
+            case "block":
+              while (index1 < len) {
+                // console.log('index2 = ',index2)
+                if (index2 == length) {
+                  // console.log("index2==length");
+                  break;
+                }
+                if (features[index2].attributes.block != null) {
+                  let li = document.createElement("li");
+                  li.setAttribute("class", "collection-item");
+                  li.innerHTML = features[index2].attributes.block;
+                  block_ul.appendChild(li);
+                  index1++;
+                }
+                index2++;
+              }
+              if (index1 != 0) block_ul.classList.add("activeUl");
+              break;
+            case "nameroom":
+              while (index1 < len) {
+                // console.log('index2 = ',index2)
+                if (index2 == length) {
+                  // console.log("index2==length");
+                  break;
+                }
+                if (features[index2].attributes.nameroom != null) {
+                  let li = document.createElement("li");
+                  li.setAttribute("class", "collection-item");
+                  li.innerHTML = features[index2].attributes.nameroom;
+                  nameroom_ul.appendChild(li);
+                  index1++;
+                }
+                index2++;
+              }
+              if (index1 != 0) nameroom_ul.classList.add("activeUl");
+              break;
+            case "roomnum":
+              while (index1 < len) {
+                // console.log('index2 = ',index2)
+                if (index2 == length) {
+                  // console.log("index2==length");
+                  break;
+                }
+                if (features[index2].attributes.roomnum != null) {
+                  let li = document.createElement("li");
+                  li.setAttribute("class", "collection-item");
+                  li.innerHTML = features[index2].attributes.roomnum;
+                  roomnum_ul.appendChild(li);
+                  index1++;
+                }
+                index2++;
+              }
+              if (index1 != 0) roomnum_ul.classList.add("activeUl");
+              break;
+          }
+        };
+        // Запрос при нажатии на "Найти"
+        const doQueryEnd = () => {
+          // console.log("DoQueryEnd");
+          checkAndCloseDropdown();
+          clearUlListSelf();
+          let qTask = new QueryTask({
+            url: `https://kazaerospace01/arcgis/rest/services/CampusMap2d_MIL1/MapServer/3`
+          });
+          let sqlTxt = checkSqlTextEnd();
+          // console.log(sqlTxt);
+          let params = new Query({
+            where: sqlTxt
+            // num: 6
+          });
+          // params.outFields = checkOutFields();
+          params.outFields = ["block, nameroom, roomnum"];
+          params.returnGeometry = true;
+          params.returnDistinctValues = false;
+          qTask
+            .execute(params)
+            .then(getResultsEnd)
+            .catch(promiseRejectedEnd);
+        }; // doQueryEnd
+        // Получение результатов
+        const getResultsEnd = (response) => {
+          clearDropdownSelf();
+          clearUlListSelf();
+          let length = response.features.length;
+          if (length == 0) {
+            // console.log("Нет данных по данному запросу");
+            let danger_el = document.getElementById("danger");
+            if (!danger_el) {
+              let div = document.querySelector("#search");
+              let div2 = document.createElement("div");
+              div2.setAttribute("id", "danger");
+              div2.classList.add("danger");
+              div2.innerHTML = "Поиск невозможен, измените значения";
+              div.append(div2);
+              setTimeout(() => div2.remove(), 2500);
+            }
+          } else if (length == 1) {
+            // console.log("goto"); //??
+            // console.log(response.features);
+            goToResult(response.features[0].geometry);
+          } else {
+            // console.log("Много ответов");
+            // console.log(response.features);
+            if (
+              input_block.value &&
+              !input_nameroom.value &&
+              !input_roomnum.value
+            ) {
+              goToResult(response.features[0].geometry);
+            }
+          }
+        }; // getResultsEnd
+        // Вызывается каждый раз, когда запрос отклоняется
+        const promiseRejectedEnd = (error) => {
+          console.error("Promise rejected: ", error.message);
+        }; // promiseRejectedEnd
+        // go to the point
+        const goToResult = (geometry) => {
+          let geom = geometry;
+          let marker_symbol = {
+            type: "simple-marker",
+            color: [226, 119, 40],
+            outline: {
+              color: [255, 255, 255],
+              width: 1
+            }
+          };
+          let search_point = new Graphic({
+            geometry: geom,
+            symbol: marker_symbol
+          });
+          graphic_layer.add(search_point);
+          view.goTo(geom);
+        };
+        // Выдает текст запроса
+        const checkSqlTextEnd = () => {
+          let text = "";
+          if (input_block.value) {
+            text += "block = '" + input_block.value + "'";
+            if (input_nameroom.value) {
+              text += " AND nameroom = '" + input_nameroom.value + "'";
+            }
+            if (input_roomnum.value) {
+              text += " AND roomnum = '" + input_roomnum.value + "'";
+            }
+          } else if (input_nameroom.value) {
+            text += "nameroom = '" + input_nameroom.value + "'";
+            if (input_roomnum.value) {
+              text += " AND roomnum = '" + input_roomnum.value + "'";
+            }
+          } else if (input_roomnum.value) {
+            text += "roomnum = '" + input_roomnum.value + "'";
+          }
+          return text;
+        };
+        // Проверка на идентичность при заполнении li при пустом поиске
+        const checkIndenticalLi = (value, name) => {
+          let check = true;
+          switch (name) {
+            case "block":
+              var el = document.querySelector("#block_complete");
+              var matches = el.querySelectorAll("li");
+              if (matches.length != 0) {
+                matches.forEach((el) => {
+                  if (el.textContent == value) {
+                    check = false;
+                  }
+                });
+              }
+              break;
+            case "nameroom":
+              var el = document.querySelector("#nameroom_complete");
+              var matches = el.querySelectorAll("li");
+              if (matches.length != 0) {
+                matches.forEach((el) => {
+                  if (el.textContent == value) {
+                    check = false;
+                  }
+                });
+              }
+              break;
+            case "roomnum":
+              var el = document.querySelector("#roomnum_complete");
+              var matches = el.querySelectorAll("li");
+              if (matches.length != 0) {
+                matches.forEach((el) => {
+                  if (el.textContent == value) {
+                    check = false;
+                  }
+                });
+              }
+              break;
+          }
+          return check;
+        };
+        var search_name;
+        // keypress
+        input_block.addEventListener("keypress", function(e) {
+          search_name = "block";
+          keyPress(e);
+        });
+        input_roomnum.addEventListener("keypress", function(e) {
+          search_name = "roomnum";
+          keyPress(e);
+        });
+        input_nameroom.addEventListener("keypress", function(e) {
+          search_name = "nameroom";
+          keyPress(e);
+        });
+        // keydown
+        input_block.addEventListener("keydown", function(e) {
+          search_name = "block";
+          keyDown(e);
+        });
+        input_roomnum.addEventListener("keydown", function(e) {
+          search_name = "roomnum";
+          keyDown(e);
+        });
+        input_nameroom.addEventListener("keydown", function(e) {
+          search_name = "nameroom";
+          keyDown(e);
+        });
+        // paste
+        input_block.addEventListener("paste", function(e) {
+          search_name = "block";
+          paste(e);
+        });
+        input_roomnum.addEventListener("paste", function(e) {
+          search_name = "roomnum";
+          paste(e);
+        });
+        input_nameroom.addEventListener("paste", function(e) {
+          search_name = "nameroom";
+          paste(e);
+        });
+        const keyPress = (e) => {
+          var code = e.charCode || e.keyCode || e.which;
+          // Check for tab and arrow keys (needed in Firefox)
+          if (
+            code !== 9 &&
+            (code < 37 || code > 40) &&
+            // and CTRL+C / CTRL+V
+            !(e.ctrlKey && (code === 99 || code === 118 || code === 97))
+          ) {
+            e.preventDefault();
+            var char = String.fromCharCode(code);
+            format_and_pos(char);
+          }
+        };
+        const keyDown = (e) => {
+          if (e.keyCode === 8 || e.keyCode === 46) {
+            // backspace or delete
+            e.preventDefault();
+            format_and_pos("", this.selectionStart === this.selectionEnd);
+          } else if (e.keyCode === 13) {
+            // doQuery(input.value, 5);
+            console.log("keyCode=13 => ", e);
+          }
+        };
+        const paste = (e) => {
+          e.preventDefault();
+          let paste = (event.clipboardData || window.clipboardData).getData(
+            "text"
+          );
+          format_and_pos(paste);
+          // for (var i = 0; i < paste.length; i++) {
+          //   format_and_pos(name, paste.charAt(i));
+          // }
+        };
+        // check entered char
+        const format_and_pos = (char, backspace) => {
+          var input = checkInputName(search_name);
+          var start = 0;
+          var end = 0;
+          var pos = 0;
+          var value = input.value;
+          if (char !== false) {
+            start = input.selectionStart;
+            end = input.selectionEnd;
+            if (backspace && start > 0) {
+              // handle backspace onkeydown
+              start--;
+            }
+            // To be able to replace the selection if there is one
+            value = value.substring(0, start) + char + value.substring(end);
+            pos = start + char.length; // caret position
+          }
+          input.value = value;
+          if (char !== false) {
+            input.setSelectionRange(pos, pos);
+          }
+          if (
+            !input_block.value &&
+            !input_roomnum.value &&
+            !input_nameroom.value
+          ) {
+            // Если поля всех поисков пусты
+            // console.log("input is empty");
+            checkAndCloseDropdown();
+            clearUlListSelf();
+            // Если есть значение в поле поиска
+          } else {
+            // Если все еще есть значение
+            if (input.value) {
+              //recod
+              doQuerySelf(value);
+              // Если нет больше значение(Backspace)
+            } else {
+              checkReadySearch();
+              checkAndCloseDropdown();
+              clearUlListSelf();
+            }
+          }
+          // let close = document.getElementById("close_button");
+          // if (input.value != "") {
+          //   close.style.display = "flex";
+          //   doQuery(value, 5);
+          // } else {
+          //   close.style.display = "none";
+          // }
+        };
+        // Проверка в какой поиск вводится текст
+        const checkInputName = (name) => {
+          let input_name;
+          switch (name) {
+            case "block":
+              return input_block;
+            case "nameroom":
+              return input_nameroom;
+            case "roomnum":
+              return input_roomnum;
+          }
+        };
+        // Запрос для Своего
+        const doQuerySelf = (value) => {
+          // console.log("DoQuerySelf");
+          checkAndCloseDropdown();
+          clearUlListSelf();
+          let qTask = new QueryTask({
+            url: `https://kazaerospace01/arcgis/rest/services/CampusMap2d_MIL1/MapServer/3`
+          });
+          // let sqlTxt = search_name + " LIKE '" + value + "%'";
+          let sqlTxt = checkSqlTxtSelf(value);
+          // console.log(sqlTxt);
+          let params = new Query({
+            where: sqlTxt
+            // num: 6
+          });
+          params.outFields = checkOutFields();
+          // params.outFields = ["block, nameroom, roomnum"];
+          params.returnGeometry = false;
+          params.returnDistinctValues = true;
+          qTask
+            .execute(params)
+            .then(getResultsSelf)
+            .catch(promiseRejectedSelf);
+        }; // doQuerySelf
+        const getResultsSelf = (response) => {
+          // console.log("features = ", response.features);
+          clearDropdownSelf();
+          clearUlListSelf();
+          let length = response.features.length;
+          if (length == 0) {
+            // console.log("Нет данных по данному запросу");
+            let li = document.createElement("li");
+            li.setAttribute("id", "dangerLi");
+            li.setAttribute("class", "collection-item");
+            li.innerHTML = "Нет данных по запросу";
+            let active_element = document.activeElement.id;
+            switch (active_element) {
+              case "block":
+                block_ul.appendChild(li);
+                block_ul.classList.add("activeUl");
+                break;
+              case "nameroom":
+                nameroom_ul.appendChild(li);
+                nameroom_ul.classList.add("activeUl");
+                break;
+              case "roomnum":
+                roomnum_ul.appendChild(li);
+                roomnum_ul.classList.add("activeUl");
+                break;
+            }
+            // } else if (length == 1) {
+            // pulseAnimation(true);
+          } else {
+            pulseAnimation(false);
+            getForSelf(response.features);
+          }
+        }; // getResultsSelf
+        // Вызывается каждый раз, когда запрос отклоняется
+        const promiseRejectedSelf = (error) => {
+          console.error("Promise rejected: ", error.message);
+        }; // promiseRejectedSelf
+        // Проверка заполненных полей для текста запроса
+        const checkSqlTxtSelf = (value) => {
+          let txt = "";
+          switch (search_name) {
+            case "block":
+              if (input_nameroom.value && input_roomnum.value) {
+                txt +=
+                  "nameroom = '" +
+                  input_nameroom.value +
+                  "' AND roomnum = '" +
+                  input_roomnum.value +
+                  "' AND block LIKE '" +
+                  value +
+                  "%'";
+              } else if (input_nameroom.value) {
+                txt +=
+                  "nameroom = '" +
+                  input_nameroom.value +
+                  "' AND block LIKE '" +
+                  value +
+                  "%'";
+              } else if (input_roomnum.value) {
+                txt +=
+                  "roomnum = '" +
+                  input_roomnum.value +
+                  "' AND block LIKE '" +
+                  value +
+                  "%'";
+              } else {
+                txt += "block LIKE '" + value + "%'";
+              }
+              break;
+            case "nameroom":
+              if (input_block.value && input_roomnum.value) {
+                txt +=
+                  "block = '" +
+                  input_block.value +
+                  "' AND roomnum = '" +
+                  input_roomnum.value +
+                  "' AND nameroom LIKE '" +
+                  value +
+                  "%'";
+              } else if (input_block.value) {
+                txt +=
+                  "block = '" +
+                  input_block.value +
+                  "' AND nameroom LIKE '" +
+                  value +
+                  "%'";
+              } else if (input_roomnum.value) {
+                txt +=
+                  "roomnum = '" +
+                  input_roomnum.value +
+                  "' AND nameroom LIKE '" +
+                  value +
+                  "%'";
+              } else {
+                txt += "nameroom LIKE '" + value + "%'";
+              }
+              break;
+            case "roomnum":
+              if (input_nameroom.value && input_block.value) {
+                txt +=
+                  "nameroom = '" +
+                  input_nameroom.value +
+                  "' AND block = '" +
+                  input_block.value +
+                  "' AND roomnum LIKE '" +
+                  value +
+                  "%'";
+              } else if (input_nameroom.value) {
+                txt +=
+                  "nameroom = '" +
+                  input_nameroom.value +
+                  "' AND roomnum LIKE '" +
+                  value +
+                  "%'";
+              } else if (input_block.value) {
+                txt +=
+                  "block = '" +
+                  input_block.value +
+                  "' AND roomnum LIKE '" +
+                  value +
+                  "%'";
+              } else {
+                txt += "roomnum LIKE '" + value + "%'";
+              }
+              break;
+          }
+          return txt;
+        };
+        // Аттрибуты которые должны придти
+        const checkOutFields = () => {
+          let out_fields = "";
+          switch (search_name) {
+            case "block":
+              out_fields = "block";
+              if (nameroom.value) {
+                out_fields += ", nameroom";
+              }
+              if (roomnum.value) {
+                out_fields += ", roomnum";
+              }
+              break;
+            case "nameroom":
+              out_fields = "nameroom";
+              if (block.value) {
+                out_fields += ", block";
+              }
+              if (roomnum.value) {
+                out_fields += ", roomnum";
+              }
+              break;
+            case "roomnum":
+              out_fields = "roomnum";
+              if (nameroom.value) {
+                out_fields += ", nameroom";
+              }
+              if (block.value) {
+                out_fields += ", block";
+              }
+              break;
+          }
+          // console.log("outfields = ", out_fields);
+          return out_fields;
+        };
+        // Первые 6 данных запроса
+        var selfDropdownList = [];
+        // Получаем список первых 6 данных для "себя"
+        const getForSelf = (features) => {
+          // console.log("getForSelf");
+          let index1 = 0;
+          let index2 = 0;
+          let len = 6;
+          let length = features.length;
+          switch (search_name) {
+            case "block":
+              // console.log("block");
+              clearDropdownSelf();
+              while (index1 < len) {
+                // console.log('index2 = ',index2)
+                if (index2 == length) {
+                  // console.log("index2==length");
+                  break;
+                }
+                // Проверяем заполнен ли атрибут и повторяется ли
+                if (
+                  features[index2].attributes.block != null &&
+                  checkIdenticalSelf(features[index2].attributes.block)
+                ) {
+                  selfDropdownList[index1] = features[index2].attributes.block;
+                  index1++;
+                }
+                index2++;
+              }
+              setToUlList("block");
+              break;
+            case "nameroom":
+              // console.log("nameroom");
+              clearDropdownSelf();
+              while (index1 < len) {
+                // console.log('index2 = ',index2)
+                if (index2 == length) {
+                  // console.log("index2==length");
+                  break;
+                }
+                // Проверяем заполнен ли атрибут и повторяется ли
+                if (
+                  features[index2].attributes.nameroom != null &&
+                  checkIdenticalSelf(features[index2].attributes.nameroom)
+                ) {
+                  selfDropdownList[index1] =
+                    features[index2].attributes.nameroom;
+                  index1++;
+                }
+                index2++;
+              }
+              setToUlList("nameroom");
+              break;
+            case "roomnum":
+              // console.log("roomnum");
+              clearDropdownSelf();
+              while (index1 < len) {
+                // console.log('index2 = ',index2)
+                if (index2 == length) {
+                  // console.log("index2==length");
+                  break;
+                }
+                // Проверяем заполнен ли атрибут и повторяется ли
+                if (
+                  features[index2].attributes.roomnum != null &&
+                  checkIdenticalSelf(features[index2].attributes.roomnum)
+                ) {
+                  selfDropdownList[index1] =
+                    features[index2].attributes.roomnum;
+                  index1++;
+                }
+                index2++;
+              }
+              setToUlList("roomnum");
+              break;
+          }
+          // console.log("selfDropdownList", selfDropdownList);
+        };
+        // Проверка на повторение для selfDropdown
+        const checkIdenticalSelf = (res) => {
+          let check = true;
+          switch (search_name) {
+            case "block":
+              selfDropdownList.forEach((el) => {
+                if (res == el) {
+                  check = false;
+                  return;
+                }
+              });
+              break;
+            case "roomnum":
+              selfDropdownList.forEach((el) => {
+                if (res == el) {
+                  check = false;
+                  return;
+                }
+              });
+              break;
+            case "nameroom":
+              selfDropdownList.forEach((el) => {
+                if (res == el) {
+                  check = false;
+                  return;
+                }
+              });
+              break;
+          }
+          return check;
+        };
+        // Создает список для dropdown и показываем его
+        const setToUlList = (name) => {
+          // console.log("setToUlList");
+          switch (name) {
+            case "block":
+              selfDropdownList.forEach((el) => {
+                let li = document.createElement("li");
+                li.setAttribute("class", "collection-item");
+                li.innerHTML = el;
+                block_ul.appendChild(li);
+              });
+              block_ul.classList.add("activeUl");
+              break;
+            case "nameroom":
+              selfDropdownList.forEach((el) => {
+                let li = document.createElement("li");
+                li.setAttribute("class", "collection-item");
+                li.innerHTML = el;
+                nameroom_ul.appendChild(li);
+              });
+              nameroom_ul.classList.add("activeUl");
+              break;
+            case "roomnum":
+              selfDropdownList.forEach((el) => {
+                let li = document.createElement("li");
+                li.setAttribute("class", "collection-item");
+                li.innerHTML = el;
+                roomnum_ul.appendChild(li);
+              });
+              roomnum_ul.classList.add("activeUl");
+              break;
+          }
+        };
+        // Закрываем dropdownList
+        const checkAndCloseDropdown = () => {
+          let activeUl = document.querySelector(".activeUl");
+          if (activeUl) activeUl.classList.remove("activeUl");
+        };
+        // Обнуляет список dropdown
+        const clearDropdownSelf = () => {
+          selfDropdownList = [];
+        };
+        // Обнуляем список всех ul
+        const clearUlListSelf = () => {
+          block_ul.innerHTML = "";
+          nameroom_ul.innerHTML = "";
+          roomnum_ul.innerHTML = "";
+        };
+        // check the readiness of the search button
+        const checkReadySearch = () => {
+          // console.log('check')
+          if (input_block.value) {
+            if (input_nameroom.value && !input_roomnum.value) {
+              pulseAnimation(false);
+            } else {
+              pulseAnimation(true);
+            }
+          } else if (input_nameroom.value) {
+            if (input_roomnum.value) {
+              pulseAnimation(true);
+            }
+            pulseAnimation(false);
+          } else if (input_roomnum.value) {
+            pulseAnimation(true);
+          } else {
+            pulseAnimation(false);
+          }
+        };
+        // Проверка анимации готовности
+        const pulseAnimation = (bol) => {
+          // console.log("pulse animation ", bol);
+          let pulse = document.querySelector("a.waves-effect");
+          if (bol) {
+            if (!pulse.classList.contains("pulse")) {
+              pulse.classList.add("pulse");
+              // console.log("pulse add");
+            }
+          } else {
+            if (pulse.classList.contains("pulse")) {
+              pulse.classList.remove("pulse");
+              // console.log("pulse remove");
+            }
+          }
+        };
+      });
+    </script>
+  </head>
+
+  <body>
+    <div id="viewDiv"></div>
+    <div id="search" class="search-menu">
+      <div id="search_block" class="search-item input-field">
+        <input id="block" class="validate" type="text" autocomplete="off" />
+        <ul id="block_complete" class="collection"></ul>
+        <label id="block_label" for="block">Поиск по Блоку</label>
+      </div>
+      <div id="search_nameroom" class="search-item input-field">
+        <input id="nameroom" class="validate" type="text" autocomplete="off" />
+        <ul id="nameroom_complete" class="collection"></ul>
+        <label id="nameroom_label" for="nameroom"
+          >Поиск по Наименованию кабинета</label
+        >
+      </div>
+      <div id="search_roomnum" class="search-item input-field">
+        <input id="roomnum" class="validate" type="text" autocomplete="off" />
+        <ul id="roomnum_complete" class="collection"></ul>
+        <label id="roomnum_label" for="roomnum">Поиск по Номеру кабинета</label>
+      </div>
+      <div id="search_button" class="search-button">
+        <a class="waves-effect waves-light btn-small small-padding"
+          ><i class="material-icons left small-margin">search</i>Найти</a
+        >
+      </div>
+    </div>
+  </body>
+</html>
