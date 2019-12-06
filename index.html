@@ -184,7 +184,7 @@
             opacity: 1,
             title: title,
             url:
-              "https://10.10.17.13:6443/arcgis/rest/services/CampusMap2d_MIL1/MapServer/",
+              "https://kas.nu.edu.kz/arcgis/rest/services/CampusMap2d_MIL1/MapServer/",
             layerId: layer_id
           });
           map.layers.add(floorLayer);
@@ -207,11 +207,11 @@
         const search_button = document.getElementById("search_button");
         var empty_block = "";
 
-        // **Direction** 10.10.17.13:6443  kazaerospace01
+        // **Direction** 10.10.17.13:6443  kazaerospace01 kas.nu.edu.kz
         var stairs_url =
-          "https://10.10.17.13:6443/arcgis/rest/services/NU/routeStairs/NAServer/%D0%9C%D0%B0%D1%80%D1%88%D1%80%D1%83%D1%82";
+          "https://kas.nu.edu.kz/arcgis/rest/services/NU/routeStairs/NAServer/%D0%9C%D0%B0%D1%80%D1%88%D1%80%D1%83%D1%82";
         var elevator_url =
-          "https://10.10.17.13:6443/arcgis/rest/services/NU/Routeelevator/NAServer/%D0%9C%D0%B0%D1%80%D1%88%D1%80%D1%83%D1%82";
+          "https://kas.nu.edu.kz/arcgis/rest/services/NU/Routeelevator/NAServer/%D0%9C%D0%B0%D1%80%D1%88%D1%80%D1%83%D1%82";
         var directionsWidget = new Directions({
           view: view,
           routeServiceUrl: stairs_url,
@@ -224,7 +224,7 @@
               {
                 locator: new Locator({
                   url:
-                    "https://10.10.17.13:6443/arcgis/rest/services/NU/RoomsLocSF/GeocodeServer"
+                    "https://kas.nu.edu.kz/arcgis/rest/services/NU/RoomsLocSF/GeocodeServer"
                 }),
                 outFields: ["*"]
               }
@@ -344,7 +344,7 @@
           checkAndCloseDropdown();
           clearUlListSelf();
           let qTask = new QueryTask({
-            url: `https://10.10.17.13:6443/arcgis/rest/services/CampusMap2d_MIL1/MapServer/3`
+            url: `https://kas.nu.edu.kz/arcgis/rest/services/CampusMap2d_MIL1/MapServer/3`
           });
           let params = new Query();
           let sqlTxt = "";
@@ -508,7 +508,7 @@
           checkAndCloseDropdown();
           clearUlListSelf();
           let qTask = new QueryTask({
-            url: `https://10.10.17.13:6443/arcgis/rest/services/CampusMap2d_MIL1/MapServer/3`
+            url: `https://kas.nu.edu.kz/arcgis/rest/services/CampusMap2d_MIL1/MapServer/3`
           });
           let sqlTxt = checkSqlTextEnd();
           // console.log(sqlTxt);
@@ -786,7 +786,7 @@
           checkAndCloseDropdown();
           clearUlListSelf();
           let qTask = new QueryTask({
-            url: `https://10.10.17.13:6443/arcgis/rest/services/CampusMap2d_MIL1/MapServer/3`
+            url: `https://kas.nu.edu.kz/arcgis/rest/services/CampusMap2d_MIL1/MapServer/3`
           });
           // let sqlTxt = search_name + " LIKE '" + value + "%'";
           let sqlTxt = checkSqlTxtSelf(value);
